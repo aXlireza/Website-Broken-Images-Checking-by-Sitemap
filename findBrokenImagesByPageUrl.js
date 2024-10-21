@@ -9,9 +9,11 @@ const sitemaps = [
 ];
 
 (async () => {
-  const browser = await puppeteer.launch({ headless: true });
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
   const page = await browser.newPage();
-  const brokenImagesLog = [];
 
   async function getLinksFromSitemap(sitemapUrl) {
     try {
@@ -54,7 +56,7 @@ const sitemaps = [
 
     await scrollToBottom(page);
     // Wait for additional content to load, if any
-    await delay(2000);
+    await delay(3000);
 
     const brokenImages = await page.evaluate(() => {
       const images = Array.from(document.images);
@@ -72,7 +74,17 @@ const sitemaps = [
 
     if (brokenImages.length > 0) {
       console.log(`Broken images found on ${pageUrl}:`, brokenImages);
-      brokenImagesLog.push({ pageUrl, brokenImages });
+      
+      // Append the broken images log to a JSON file
+      let existingLog = [];
+      // TODO: Create and setup empty array in there if file was not found
+      if (fs.existsSync('./broken_images_log.json')) {
+        const rawData = fs.readFileSync('./broken_images_log.json');
+        existingLog = JSON.parse(rawData);
+      }
+      existingLog.push({ pageUrl, brokenImages });
+      
+      fs.writeFileSync('./broken_images_log.json', JSON.stringify(existingLog, null, 2));
     } else {
       console.log(`No broken images on ${pageUrl}`);
     }
@@ -85,8 +97,5 @@ const sitemaps = [
     }
   }
 
-  // Write the broken images log to a JSON file
-  fs.writeFileSync('./broken_images_log.json', JSON.stringify(brokenImagesLog, null, 2));
-  
   await browser.close();
 })();
